@@ -9,7 +9,7 @@ function features = sgbfb(log_mel_spec, omega_max, size_max, nu, distance, phase
 %   distance        spacing of filters (<1)
 %   phases          Phase of [spectral temporal] modulation filters (may be a cell with more than one pair)
 %
-% - Separated Gabor filter bank v1.0 -
+% - Separated Gabor filter bank v1.1 -
 %
 % This script extracts separable Gabor filter bank features
 % from a spectro-temporal representation, e.g., from a log Mel-spectrogram.
@@ -17,7 +17,7 @@ function features = sgbfb(log_mel_spec, omega_max, size_max, nu, distance, phase
 % 100 Hz and the spectral resolution is assumed to be about 1 ERB per channel.
 % A detailed explanation is given in [1].
 %
-% Copyright (C) 2015 Marc René Schädler
+% Copyright (C) 2015-2018 Marc René Schädler
 % E-mail marc.r.schaedler@uni-oldenburg.de
 % Institute Carl-von-Ossietzky University Oldenburg, Germany
 %
@@ -25,7 +25,7 @@ function features = sgbfb(log_mel_spec, omega_max, size_max, nu, distance, phase
 %
 % Release Notes:
 % v1.0 - Inital release
-%
+% v1.1 - Reduce default to RR-II filters and fix warning message 
 
 %% Default settings and checks
 
@@ -54,7 +54,7 @@ end
 
 % Default Phases of modulation filters [spectral temporal]
 if nargin < 6 || isempty(phases)
-  phases = {[0 0], [0 pi/2], [pi/2 0], [pi/2 pi/2]};
+  phases = {[0 0], [pi/2 pi/2]};
 end
 
 if ~iscell(phases)
@@ -170,7 +170,10 @@ end
 
 % Only generate filters which are not cached
 if ~caching || isempty(cache) || ~isfield(cache, config)
-  w = 2*pi / abs(omega) * nu / 2;
+  w = inf;
+  if omega > 0
+    w = 2*pi / abs(omega) * nu / 2;
+  end
   if w > size_max
     w = size_max;
     omega = 0;

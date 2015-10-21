@@ -1,23 +1,24 @@
-function [log_mel_spec freq_centers] = log_mel_spectrogram(signal, fs, win_shift, win_length, freq_range, num_bands)
+function [log_mel_spec freq_centers] = log_mel_spectrogram(signal, fs, win_shift, win_length, freq_range, num_bands, band_factor)
 % usage: log_mel_spec = log_mel_spectrogram(signal, fs)
 %   signal      waveform signal
 %   fs          sampling rate in Hz
 %
-% usage [log_mel_spec freq_centers] = log_mel_spectrogram(signal, fs, win_shift, win_length, freq_range, num_bands)
+% usage [log_mel_spec freq_centers] = log_mel_spectrogram(signal, fs, win_shift, win_length, freq_range, num_bands, band_factor)
 %   win_shift   window shift in ms
 %   win_length  window length in ms
 %   freq_range  [lower upper] frequency
 %   num_bands   number of Mel-bands in freq_range
+%   band_factor spectral super-sampling factor
 %
-% - Log Mel-spectrogram v1.0 -
+% - Log Mel-spectrogram v1.1 -
 %
-% This script extracts spectro-temporal representations called 
+% This script extracts spectro-temporal representations called
 % "logarithmically scaled Mel-spectrograms" from audio signals.
 % It roughly resembles basic auditory principles such as a limited spectral
 % resolution and a compressive intensity perception.
 % A detailed explanation is given in [1].
 %
-% Copyright (C) 2015 Marc René Schädler
+% Copyright (C) 2015-2018 Marc René Schädler
 % E-mail marc.r.schaedler@uni-oldenburg.de
 % Institute Carl-von-Ossietzky University Oldenburg, Germany
 %
@@ -25,7 +26,7 @@ function [log_mel_spec freq_centers] = log_mel_spectrogram(signal, fs, win_shift
 %
 % Release Notes:
 % v1.0 - Inital release
-%
+% v1.1 - Add option for spectral super-sampling and increase upper frequency limit
 
 %% Default settings and checks
 
@@ -43,9 +44,9 @@ if nargin < 4 || isempty(win_length)
   win_length = 25; % ms
 end
 
-% Set the default frequency range from 64Hz to fs/2 (max. 8kHz)
+% Set the default frequency range from 64Hz to fs/2 (max. 12kHz)
 if nargin < 5 || isempty(freq_range)
-  freq_range = [64 min(floor(fs./2), 8000)];
+  freq_range = [64 min(floor(fs./2), 12000)];
 end
 
 % Cover the maximum frequency range with equally Mel-spaced filters
@@ -54,6 +55,11 @@ if nargin < 6 || isempty(num_bands)
   channel_dist = (hz2mel(4000) - hz2mel(64))./(23+1); % Distance between center frequencies in Mel
   num_bands = floor((hz2mel(freq_range(2)) - hz2mel(freq_range(1)))./channel_dist)-1;
   freq_range(2) = mel2hz(hz2mel(freq_range(1))+channel_dist.*(num_bands+1));
+end
+
+% Set the default band_factor to 1
+if nargin < 7 || isempty(band_factor)
+  band_factor = 1;
 end
 
 
@@ -84,17 +90,17 @@ signal_frame = bsxfun(@times, frames, window_function);
 spec = 1./num_coeff .* abs(fft(signal_frame, num_coeff, 1));
 
 % Mel-transformation
-freq_centers = mel2hz(linspace(hz2mel(freq_range(1)), hz2mel(freq_range(2)), num_bands+2));
-mel_spec = triafbmat(fs, num_coeff, freq_centers, [1 1]) * spec;
+freq_centers = mel2hz(linspace(hz2mel(freq_range(1)), hz2mel(freq_range(2)), (num_bands+1).*band_factor+1));
+mel_spec = triafbmat(fs, num_coeff, freq_centers, [1 1].*band_factor) * spec;
 
 % Return only real center frequencies
-freq_centers = freq_centers(2:end-1);
+freq_centers = freq_centers(1+band_factor:end-band_factor);
 
 
 %% Logarithmic compression
 
-% Relative to 0 dB SPL with lower limit at -20 dB SPL
-log_mel_spec = max(-20, 20.*log10(max(mel_spec, 0)) + 100);
+% Relative to 0 dB SPL with lower limit at -20 dB SPL and upper limit at 130 dB SPL
+log_mel_spec = max(-20,min(0,20.*log10(max(mel_spec, 0))) + 130);
 end
 
 
