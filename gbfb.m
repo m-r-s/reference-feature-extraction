@@ -8,7 +8,7 @@ function features = gbfb(log_mel_spec, omega_max, size_max, nu, distance, phases
 %   nu              half-waves under the envelope in [spectral temporal] dimension
 %   distance        [spectral temporal] spacing of filters (<1)
 %
-% - Gabor filter bank v3.0 -
+% - Gabor filter bank v4.0 -
 %
 % This script extracts Gabor filter bank features
 % from a spectro-temporal representation, e.g., from a log Mel-spectrogram.
@@ -27,6 +27,7 @@ function features = gbfb(log_mel_spec, omega_max, size_max, nu, distance, phases
 % v3.0 - Fixed hann_win bug
 % v3.0 - Removed log Mel-spectrogram calculation
 % v3.0 - Added caching and simplified feature vector composition
+% v4.0 - Sped-up part of functions fftconv2 and gfbank_calcaxis
 %
  
 %% Default settings and checks
@@ -110,25 +111,14 @@ omega_min = (pi .* nu) ./ size_max;
 c = distance .* 8 ./ nu;
 % Second factor of Eq. (2a)
 space_n = (1 + c(2)./2) ./ (1 - c(2)./2);
-count_n = 0;
-omega_n(1) = omega_max(2);
-% Iterate starting with omega_max in spectral dimension
-while omega_n/space_n > omega_min(2)
-  omega_n(1+count_n) = omega_max(2)/space_n.^count_n;
-  count_n = count_n + 1;
-end
-omega_n = fliplr(omega_n);
-% Add DC
-omega_n = [0,omega_n];
+% Vectorised iteration starting with omega_max in spectral dimension, and adding DC (0)
+n = floor(log(omega_max(2)/omega_min(2))/log(space_n));
+omega_n = [0,omega_max(2)./space_n.^(n:-1:0)];
 % Second factor of Eq. (2a)
 space_k = (1 + c(1)./2) ./ (1 - c(1)./2);
-count_k = 0;
-omega_k(1) = omega_max(1);
-% Iterate starting with omega_max in temporal dimension
-while omega_k/space_k > omega_min(1)
-  omega_k(1+count_k) = omega_max(1)/space_k.^count_k;
-  count_k = count_k + 1;
-end
+% Vectorised iteration starting with omega_max in temporal dimension
+k = floor(log(omega_max(1)/omega_min(1))/log(space_k));
+omega_k = omega_max(1)./space_k.^(0:k);
 % Add DC and negative MFs for spectro-temporal opposite 
 % filters (upward/downward)
 omega_k = [-omega_k,0,fliplr(omega_k)];
@@ -266,10 +256,7 @@ size_y = size(in1,1)+size(in2,1)-1;
 size_x = size(in1,2)+size(in2,2)-1;
 fft_size_x = 2.^ceil(log2(size_x));
 fft_size_y = 2.^ceil(log2(size_y));
-in1_fft = fft2(in1,fft_size_y,fft_size_x);
-in2_fft = fft2(in2,fft_size_y,fft_size_x);
-out_fft = in1_fft .* in2_fft;
-out_padd = ifft2(out_fft);
+out_padd = ifft2(fft2(in1,fft_size_y,fft_size_x) .* fft2(in2,fft_size_y,fft_size_x));
 out_padd = out_padd(1:size_y,1:size_x);
 switch shape
   case 'same'
