@@ -145,8 +145,8 @@ assert(all(size(x1) == size(y1)) && all(size(x2) == size(y2)), ...
 yrange = [max(min(y1),min(y2)); min(max(y1),max(y2))];
 
 % Interpolate the corrsponding ranges on the x-axis.
-xrange1 = interp1q(y1, x1, yrange);
-xrange2 = interp1q(y2, x2, yrange);
+xrange1 = interp1(y1, x1, yrange);
+xrange2 = interp1(y2, x2, yrange);
 
 % Sample the x-ranges in 0.5 dB steps
 xrange1 = [ceil(xrange1(1)*2)/2; floor(xrange1(2)*2)/2];
@@ -157,11 +157,11 @@ xpoints2 = (xrange2(1):0.5:xrange2(2)).';
 % Integrate the shifts in both directions if sampling points exist
 if ~isempty(xpoints1) && ~isempty(xpoints2)
   % Look up the y-values at the sample points
-  ypoints1 = interp1q(x1, y1, xpoints1);
-  ypoints2 = interp1q(x2, y2, xpoints2);
+  ypoints1 = interp1(x1, y1, xpoints1, 'linear','extrap');
+  ypoints2 = interp1(x2, y2, xpoints2, 'linear','extrap');
   % Get the x-values of the "other" system at the same y-value
-  xpoints12 = interp1q(y2, x2, ypoints1);
-  xpoints21 = interp1q(y1, x1, ypoints2);
+  xpoints12 = interp1(y2, x2, ypoints1, 'linear','extrap');
+  xpoints21 = interp1(y1, x1, ypoints2, 'linear','extrap');
   % Average over the difference on the x-values
   shift1 = mean(xpoints12-xpoints1);
   shift2 = mean(xpoints21-xpoints2);
